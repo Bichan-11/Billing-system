@@ -8,594 +8,773 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class BillingDashboard {
-    private JFrame window;
-
-    public void launch() {
-        window = new JFrame("Invoice Manager");
-        window.setSize(960, 530);
-        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        window.setLocationRelativeTo(null);
-        displayCustomerPanel();
-        window.setVisible(true);
+    public BillingDashboard() {
+        showCustomerList();
     }
 
-    private void showView(JPanel view) {
-        window.setContentPane(view);
-        window.revalidate();
-        window.repaint();
-    }
+    public void showCustomerList() {
+        JFrame frame = new JFrame("Invoice Manager");
+        frame.setSize(950, 520);
+        frame.setLayout(null);
 
-    private void displayCustomerPanel() {
-        JPanel panel = new JPanel(null);
+        JButton newCustomerBtn = new JButton("New Customer");
+        newCustomerBtn.setBounds(10, 10, 140, 30);
+        frame.add(newCustomerBtn);
 
-        JLabel heading = new JLabel("Customers");
-        heading.setFont(new Font("Arial", Font.BOLD, 16));
-        heading.setBounds(10, 8, 200, 28);
-        panel.add(heading);
+        JButton createInvoiceBtn = new JButton("Create Invoice");
+        createInvoiceBtn.setBounds(160, 10, 250, 30);
 
-        JButton registerBtn = new JButton("Register Customer");
-        registerBtn.setBounds(800, 8, 135, 28);
-        panel.add(registerBtn);
+        JButton viewHistoryBtn = new JButton("View Invoice History");
+        viewHistoryBtn.setBounds(420, 10, 200, 30);
 
-        JLabel filterLabel = new JLabel("Search:");
-        filterLabel.setBounds(10, 42, 50, 25);
-        panel.add(filterLabel);
+        JLabel searchLabel = new JLabel("Search by Username");
+        searchLabel.setBounds(690, 10, 140, 30);
+        frame.add(searchLabel);
 
-        JTextField filterField = new JTextField();
-        filterField.setBounds(65, 42, 150, 25);
-        panel.add(filterField);
+        JTextField searchField = new JTextField();
+        searchField.setBounds(830, 10, 100, 30);
+        frame.add(searchField);
 
-        String[] headers = {"ID", "Full Name", "Handle"};
-        DefaultTableModel model = new DefaultTableModel(headers, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) { return false; }
+        String columnName[] = {
+                "id",
+                "name",
+                "username"
         };
 
-        JTable table = new JTable(model);
-        JScrollPane sp = new JScrollPane(table);
-        sp.setBounds(10, 75, 925, 310);
-        panel.add(sp);
-
-        JButton createInvBtn = new JButton("New Invoice");
-        createInvBtn.setBounds(10, 400, 120, 32);
-        panel.add(createInvBtn);
-
-        JButton historyBtn = new JButton("Invoice History");
-        historyBtn.setBounds(140, 400, 140, 32);
-        panel.add(historyBtn);
-
-        fetchCustomers(model, "");
-
-        registerBtn.addActionListener(new ActionListener() {
+        DefaultTableModel tableModel = new DefaultTableModel(columnName, 0) {
             @Override
-            public void actionPerformed(ActionEvent e) {
-                openRegisterDialog(model);
+            public boolean isCellEditable(int row, int column) {
+                return false; // all cells are now non-editable
             }
-        });
-
-        filterField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(KeyEvent e) {
-                model.setRowCount(0);
-                fetchCustomers(model, filterField.getText().trim());
-            }
-        });
-
-        createInvBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int row = table.getSelectedRow();
-                if (row < 0) {
-                    JOptionPane.showMessageDialog(window, "Pick a customer first.", "Notice", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                int cid = (int) model.getValueAt(row, 0);
-                String cname = model.getValueAt(row, 1).toString();
-                displayInvoicePanel(cid, cname);
-            }
-        });
-
-        historyBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int row = table.getSelectedRow();
-                if (row < 0) {
-                    JOptionPane.showMessageDialog(window, "Pick a customer first.", "Notice", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                int cid = (int) model.getValueAt(row, 0);
-                String cname = model.getValueAt(row, 1).toString();
-                displayHistoryPanel(cid, cname);
-            }
-        });
-
-        showView(panel);
-    }
-
-    private void openRegisterDialog(DefaultTableModel customerModel) {
-        JDialog dialog = new JDialog(window, "Register Customer", true);
-        dialog.setSize(330, 180);
-        dialog.setLayout(null);
-        dialog.setResizable(false);
-
-        JLabel nl = new JLabel("Name:");
-        nl.setBounds(15, 15, 70, 25);
-        dialog.add(nl);
-
-        JTextField nameField = new JTextField();
-        nameField.setBounds(95, 15, 200, 25);
-        dialog.add(nameField);
-
-        JLabel hl = new JLabel("Handle:");
-        hl.setBounds(15, 50, 70, 25);
-        dialog.add(hl);
-
-        JTextField handleField = new JTextField();
-        handleField.setBounds(95, 50, 200, 25);
-        dialog.add(handleField);
-
-        JButton saveBtn = new JButton("Save");
-        saveBtn.setBounds(120, 90, 90, 30);
-        dialog.add(saveBtn);
-
-        saveBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String n = nameField.getText().trim();
-                String h = handleField.getText().trim();
-                if (n.isEmpty() || h.isEmpty()) {
-                    JOptionPane.showMessageDialog(dialog, "Fill in all fields.", "Warning", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                try {
-                    Connection c = DatabaseHelper.open();
-                    PreparedStatement ps = c.prepareStatement("INSERT INTO customer (name, username) VALUES (?, ?)");
-                    ps.setString(1, n);
-                    ps.setString(2, h);
-                    ps.executeUpdate();
-                    c.close();
-                    dialog.dispose();
-                    JOptionPane.showMessageDialog(window, "Customer registered.", "Done", JOptionPane.INFORMATION_MESSAGE);
-                    customerModel.setRowCount(0);
-                    fetchCustomers(customerModel, "");
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(dialog, ex.getMessage() + ". Try a different handle.", "Error", JOptionPane.ERROR_MESSAGE);
-                }
-            }
-        });
-
-        dialog.setLocationRelativeTo(window);
-        dialog.setVisible(true);
-    }
-
-    private void displayInvoicePanel(int customerId, String customerName) {
-        JPanel panel = new JPanel(null);
-
-        JLabel title = new JLabel("Invoice \u2014 " + customerName);
-        title.setFont(new Font("Arial", Font.BOLD, 14));
-        title.setBounds(10, 8, 500, 28);
-        panel.add(title);
-
-        JLabel pl = new JLabel("Product:");
-        pl.setBounds(10, 45, 60, 25);
-        panel.add(pl);
-
-        JTextField prodField = new JTextField();
-        prodField.setBounds(75, 45, 170, 25);
-        panel.add(prodField);
-
-        JLabel rl = new JLabel("Rate:");
-        rl.setBounds(255, 45, 35, 25);
-        panel.add(rl);
-
-        JTextField rateField = new JTextField();
-        rateField.setBounds(295, 45, 80, 25);
-        panel.add(rateField);
-
-        JLabel ql = new JLabel("Qty:");
-        ql.setBounds(385, 45, 30, 25);
-        panel.add(ql);
-
-        JTextField qtyField = new JTextField();
-        qtyField.setBounds(420, 45, 60, 25);
-        panel.add(qtyField);
-
-        JButton appendBtn = new JButton("Add");
-        appendBtn.setBounds(495, 45, 70, 25);
-        panel.add(appendBtn);
-
-        JButton dropBtn = new JButton("Remove Selected");
-        dropBtn.setBounds(575, 45, 140, 25);
-        panel.add(dropBtn);
-
-        String[] cols = {"Product", "Qty", "Rate", "Subtotal"};
-        DefaultTableModel itemModel = new DefaultTableModel(cols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        JTable itemTable = new JTable(itemModel);
-        JScrollPane sp = new JScrollPane(itemTable);
-        sp.setBounds(10, 80, 925, 280);
-        panel.add(sp);
+        JTable customerTable = new JTable(tableModel);
+        customerTable.setBounds(20, 50, 900, 350);
 
-        JLabel gl = new JLabel("Grand Total:");
-        gl.setFont(new Font("Arial", Font.BOLD, 13));
-        gl.setBounds(720, 370, 90, 25);
-        panel.add(gl);
+        JScrollPane scrollPane = new JScrollPane(customerTable);
+        scrollPane.setBounds(20, 50, 900, 350);
+        frame.add(scrollPane);
 
-        JTextField grandField = new JTextField("0.00");
-        grandField.setBounds(815, 370, 120, 25);
-        grandField.setEditable(false);
-        panel.add(grandField);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
 
-        JButton backBtn = new JButton("Back");
-        backBtn.setBounds(10, 425, 90, 32);
-        panel.add(backBtn);
+        loadCustomerData(tableModel);
 
-        JButton saveBtn = new JButton("Save & Print");
-        saveBtn.setBounds(110, 425, 130, 32);
-        panel.add(saveBtn);
-
-        SwingUtilities.invokeLater(() -> prodField.requestFocusInWindow());
-
-        appendBtn.addActionListener(new ActionListener() {
+        // Action listener for new customer button
+        ActionListener a1 = new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String product = prodField.getText().trim();
-                String rateStr = rateField.getText().trim();
-                String qtyStr = qtyField.getText().trim();
-
-                if (product.isEmpty() || rateStr.isEmpty() || qtyStr.isEmpty()) {
-                    JOptionPane.showMessageDialog(window, "All item fields are required.", "Warning", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                if (!validateDecimal(rateStr) || !validateInteger(qtyStr)) {
-                    JOptionPane.showMessageDialog(window, "Invalid rate or quantity.", "Warning", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-
-                double rate = Math.round(Double.parseDouble(rateStr) * 100.0) / 100.0;
-                int qty = Integer.parseInt(qtyStr);
-                double subtotal = Math.round(rate * qty * 100.0) / 100.0;
-
-                itemModel.addRow(new Object[]{product, qty, rate, subtotal});
-                grandField.setText(String.format("%.2f", computeGrandTotal(itemModel)));
-                prodField.setText("");
-                rateField.setText("");
-                qtyField.setText("");
-                prodField.requestFocusInWindow();
+                openNewCustomerForm();
+                frame.dispose();
             }
-        });
-
-        dropBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int sel = itemTable.getSelectedRow();
-                if (sel >= 0) {
-                    itemModel.removeRow(sel);
-                    grandField.setText(String.format("%.2f", computeGrandTotal(itemModel)));
-                }
-            }
-        });
-
-        backBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                displayCustomerPanel();
-            }
-        });
-
-        saveBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (itemModel.getRowCount() == 0) {
-                    JOptionPane.showMessageDialog(window, "Add at least one item.", "Warning", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                int invId = persistInvoice(customerId, itemModel);
-                if (invId > 0) {
-                    JOptionPane.showMessageDialog(window, "Invoice #" + invId + " saved.", "Success", JOptionPane.INFORMATION_MESSAGE);
-                    generatePrintout(customerName, invId, itemModel, computeGrandTotal(itemModel));
-                    displayCustomerPanel();
-                }
-            }
-        });
-
-        showView(panel);
-    }
-
-    private void displayHistoryPanel(int customerId, String customerName) {
-        JPanel panel = new JPanel(null);
-
-        JLabel heading = new JLabel("Invoices \u2014 " + customerName);
-        heading.setFont(new Font("Arial", Font.BOLD, 14));
-        heading.setBounds(10, 8, 400, 28);
-        panel.add(heading);
-
-        String[] cols = {"Invoice #", "Date", "Amount"};
-        DefaultTableModel hModel = new DefaultTableModel(cols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        JTable hTable = new JTable(hModel);
-        JScrollPane sp = new JScrollPane(hTable);
-        sp.setBounds(10, 45, 925, 330);
-        panel.add(sp);
+        newCustomerBtn.addActionListener(a1);
 
-        JButton detailBtn = new JButton("View Details");
-        detailBtn.setBounds(10, 390, 120, 32);
-        panel.add(detailBtn);
+        // Key listener for search field
+        KeyAdapter k1 = new KeyAdapter() {
+            public void keyPressed(KeyEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    tableModel.setRowCount(0);
+                    String keyword = searchField.getText();
 
-        JButton backBtn = new JButton("Back");
-        backBtn.setBounds(140, 390, 90, 32);
-        panel.add(backBtn);
+                    if (keyword.isEmpty()) {
+                        loadCustomerData(tableModel);
+                        return;
+                    }
 
-        fetchInvoices(hModel, customerId);
+                    PreparedStatement ps = null;
+                    String query = "select * from customer where username like ? limit 20";
 
-        detailBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int row = hTable.getSelectedRow();
-                if (row < 0) {
-                    JOptionPane.showMessageDialog(window, "Select an invoice.", "Notice", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                int invId = (int) hModel.getValueAt(row, 0);
-                openDetailDialog(invId);
+                    try {
+                        Connection conn = DatabaseHelper.open();
+                        ps = conn.prepareStatement(query);
+                        ps.setString(1, '%' + keyword + '%');
+                        ResultSet rs = ps.executeQuery();
+                        while (rs.next()) {
+                            tableModel.addRow(
+                                    new Object[] { rs.getInt("id"), rs.getString("name"), rs.getString("username") });
+                        }
+                        conn.close();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                });
             }
-        });
-
-        backBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                displayCustomerPanel();
-            }
-        });
-
-        showView(panel);
-    }
-
-    private void openDetailDialog(int invoiceId) {
-        JDialog dialog = new JDialog(window, "Invoice #" + invoiceId + " Details", true);
-        dialog.setSize(520, 380);
-        dialog.setLayout(null);
-
-        String[] cols = {"Product", "Qty", "Unit Price", "Line Total"};
-        DefaultTableModel dModel = new DefaultTableModel(cols, 0) {
-            @Override
-            public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        JTable dTable = new JTable(dModel);
-        JScrollPane sp = new JScrollPane(dTable);
-        sp.setBounds(10, 10, 485, 240);
-        dialog.add(sp);
+        searchField.addKeyListener(k1);
 
-        fetchInvoiceItems(dModel, invoiceId);
+        // event to detect row selection in the customer table
+        customerTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = customerTable.getSelectedRow();
 
-        JLabel totalLabel = new JLabel("Total: " + String.format("%.2f", computeGrandTotal(dModel)));
-        totalLabel.setFont(new Font("Arial", Font.BOLD, 13));
-        totalLabel.setBounds(320, 260, 180, 25);
-        dialog.add(totalLabel);
-
-        JButton closeBtn = new JButton("Close");
-        closeBtn.setBounds(10, 295, 80, 30);
-        dialog.add(closeBtn);
-
-        closeBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                dialog.dispose();
+                if (selectedRow != -1) {
+                    Object name = tableModel.getValueAt(selectedRow, 1);
+                    createInvoiceBtn.setText("Create Invoice for " + name.toString());
+                    frame.add(createInvoiceBtn);
+                    frame.add(viewHistoryBtn);
+                    frame.revalidate();
+                    frame.repaint();
+                }
             }
         });
 
-        dialog.setLocationRelativeTo(window);
-        dialog.setVisible(true);
+        // Action listener for create invoice button
+        ActionListener createInvoiceAction = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Object id = tableModel.getValueAt(customerTable.getSelectedRow(), 0);
+                Object name = tableModel.getValueAt(customerTable.getSelectedRow(), 1);
+                String stringId = id.toString();
+                openInvoiceForm(name.toString(), Integer.parseInt(stringId));
+                frame.dispose();
+            }
+        };
+
+        createInvoiceBtn.addActionListener(createInvoiceAction);
+
+        // Action listener for view history button
+        ActionListener viewHistoryAction = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                Object id = tableModel.getValueAt(customerTable.getSelectedRow(), 0);
+                Object name = tableModel.getValueAt(customerTable.getSelectedRow(), 1);
+                String stringId = id.toString();
+                showInvoiceHistory(name.toString(), Integer.parseInt(stringId));
+                frame.dispose();
+            }
+        };
+
+        viewHistoryBtn.addActionListener(viewHistoryAction);
     }
 
-    private void fetchCustomers(DefaultTableModel model, String keyword) {
+    public void loadCustomerData(DefaultTableModel tableModel) {
+        PreparedStatement ps = null;
+
         try {
-            Connection c = DatabaseHelper.open();
-            PreparedStatement ps;
-            if (keyword.isEmpty()) {
-                ps = c.prepareStatement("SELECT id, name, username FROM customer ORDER BY id DESC LIMIT 50");
-            } else {
-                ps = c.prepareStatement("SELECT id, name, username FROM customer WHERE username LIKE ? ORDER BY id DESC LIMIT 50");
-                ps.setString(1, "%" + keyword + "%");
-            }
+            Connection conn = DatabaseHelper.open();
+            String query = "Select * from customer limit 20";
+            ps = conn.prepareStatement(query);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                model.addRow(new Object[]{rs.getInt("id"), rs.getString("name"), rs.getString("username")});
+                tableModel.addRow(new Object[] {
+                        rs.getInt("id"), rs.getString("name"), rs.getString("username")
+                });
             }
-            c.close();
+            conn.close();
         } catch (Exception ex) {
             ex.printStackTrace();
+            return;
         }
     }
 
-    private void fetchInvoices(DefaultTableModel model, int customerId) {
+    public void openNewCustomerForm() {
+        JFrame frame = new JFrame("New Customer");
+        frame.setSize(380, 200);
+        frame.setLayout(null);
+        frame.setResizable(false);
+
+        JLabel nameLabel = new JLabel("Customer Name:");
+        nameLabel.setBounds(10, 10, 150, 30);
+        frame.add(nameLabel);
+
+        JTextField nameField = new JTextField();
+        nameField.setBounds(170, 10, 170, 30);
+        frame.add(nameField);
+
+        JLabel usernameLabel = new JLabel("Customer Username:");
+        usernameLabel.setBounds(10, 50, 150, 30);
+        frame.add(usernameLabel);
+
+        JTextField usernameField = new JTextField();
+        usernameField.setBounds(170, 50, 170, 30);
+        frame.add(usernameField);
+
+        JButton saveBtn = new JButton("Save");
+        saveBtn.setBounds(50, 100, 100, 30);
+        frame.add(saveBtn);
+
+        JButton backBtn = new JButton("Back to Customers");
+        backBtn.setBounds(160, 100, 180, 30);
+        frame.add(backBtn);
+
+        // Action listener for save button
+        ActionListener a1 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String customerName = nameField.getText();
+                String customerUsername = usernameField.getText();
+
+                if (customerName.isEmpty() || customerUsername.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "All fields are required", "Warning",
+                            JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                PreparedStatement ps = null;
+                String query = "Insert into customer (name, username) values (?, ?)";
+                try {
+                    Connection conn = DatabaseHelper.open();
+                    ps = conn.prepareStatement(query);
+                    ps.setString(1, customerName);
+                    ps.setString(2, customerUsername);
+                    ps.executeUpdate();
+                    conn.close();
+                    frame.dispose();
+                    JOptionPane.showMessageDialog(null, "Customer added successfully", "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                    showCustomerList();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(null, ex.getMessage() + ". Try a different username", "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+            }
+        };
+
+        saveBtn.addActionListener(a1);
+
+        // Action listener for back button
+        ActionListener a2 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                goBackToCustomers(frame);
+            }
+        };
+
+        backBtn.addActionListener(a2);
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    public void openInvoiceForm(String customerName, int customerId) {
+        final String[] priceValue = { "" };
+        final String[] qtyValue = { "" };
+        final Double[] runningTotal = { 0.00 };
+        JFrame frame = new JFrame("New Invoice");
+        frame.setSize(1000, 500);
+        frame.setLayout(null);
+        frame.setResizable(false);
+
+        JLabel customerLabel = new JLabel("Customer");
+        customerLabel.setBounds(10, 10, 80, 30);
+        frame.add(customerLabel);
+
+        JTextField customerNameField = new JTextField(customerName);
+        customerNameField.setBounds(100, 10, 150, 30);
+        customerNameField.setEditable(false);
+        frame.add(customerNameField);
+
+        JLabel productLabel = new JLabel("Product Name");
+        productLabel.setBounds(10, 50, 100, 30);
+        frame.add(productLabel);
+
+        JTextField productField = new JTextField();
+        productField.setBounds(10, 85, 120, 30);
+        SwingUtilities.invokeLater(() -> productField.requestFocusInWindow());
+        frame.add(productField);
+
+        JLabel priceLabel = new JLabel("Price");
+        priceLabel.setBounds(140, 50, 80, 30);
+        frame.add(priceLabel);
+
+        JTextField priceField = new JTextField();
+        priceField.setBounds(140, 85, 100, 30);
+        frame.add(priceField);
+
+        JLabel qtyLabel = new JLabel("Quantity");
+        qtyLabel.setBounds(250, 50, 80, 30);
+        frame.add(qtyLabel);
+
+        JTextField qtyField = new JTextField();
+        qtyField.setBounds(250, 85, 80, 30);
+        frame.add(qtyField);
+
+        JButton addItemBtn = new JButton("Add to Invoice");
+        addItemBtn.setBounds(10, 125, 130, 30);
+        frame.add(addItemBtn);
+
+        JButton backBtn = new JButton("Back to Customers");
+        backBtn.setBounds(150, 125, 180, 30);
+        frame.add(backBtn);
+
+        String cells[] = { "Product", "Qty", "Price", "Total" };
+        DefaultTableModel tableModel = new DefaultTableModel(cells, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // all cells are now non-editable
+            }
+        };
+
+        JTable invoiceTable = new JTable(tableModel);
+        invoiceTable.setBounds(20, 165, 500, 220);
+
+        JScrollPane scrollPane = new JScrollPane(invoiceTable);
+        scrollPane.setBounds(20, 165, 500, 220);
+        frame.add(scrollPane);
+
+        JLabel totalLabel = new JLabel("Total Amount");
+        totalLabel.setBounds(20, 395, 100, 30);
+        frame.add(totalLabel);
+
+        JTextField totalField = new JTextField();
+        totalField.setBounds(380, 395, 120, 30);
+        totalField.setEditable(false);
+        frame.add(totalField);
+
+        JButton submitBtn = new JButton("Save and Print Invoice");
+        submitBtn.setBounds(280, 435, 200, 30);
+        frame.add(submitBtn);
+
+        // Key listener for price field
+        KeyAdapter k1 = new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    String text = priceField.getText();
+                    if (text.isEmpty() || isValidDecimal(text)) {
+                        priceValue[0] = text;
+                        priceField.setText(text);
+                    } else {
+                        priceField.setText(priceValue[0]);
+                    }
+                });
+            }
+        };
+
+        priceField.addKeyListener(k1);
+
+        // Key listener for quantity field
+        KeyAdapter k2 = new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                SwingUtilities.invokeLater(() -> {
+                    String text = qtyField.getText();
+                    if (text.isEmpty() || isValidInteger(text)) {
+                        qtyValue[0] = text;
+                        qtyField.setText(text);
+                    } else {
+                        qtyField.setText(qtyValue[0]);
+                    }
+                });
+            }
+        };
+
+        qtyField.addKeyListener(k2);
+
+        // Action listener for add item button
+        ActionListener a1 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String product = productField.getText();
+                String price = priceField.getText();
+                Integer quantity = Integer.parseInt(qtyField.getText());
+                Double unitPrice = Double.parseDouble(price);
+                unitPrice = ((long) (unitPrice * 100.0)) / 100.0;
+                Double lineTotal = quantity * unitPrice;
+                runningTotal[0] = runningTotal[0] + lineTotal;
+
+                if (product.isEmpty() || price.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "Product name and price are required", "Warning",
+                            JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                tableModel.addRow(new Object[] { product, quantity, unitPrice, lineTotal });
+                productField.setText("");
+                priceField.setText("");
+                qtyField.setText("");
+                totalField.setText(runningTotal[0].toString());
+            }
+        };
+
+        addItemBtn.addActionListener(a1);
+
+        // Action listener for back button
+        ActionListener a2 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                goBackToCustomers(frame);
+            }
+        };
+
+        backBtn.addActionListener(a2);
+
+        // Action listener for submit button
+        ActionListener submitAction = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (tableModel.getRowCount() == 0) {
+                    JOptionPane.showMessageDialog(null, "Add at least one item to the invoice", "Warning",
+                            JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                Connection conn = null;
+                try {
+                    conn = DatabaseHelper.open();
+                    conn.setAutoCommit(false);
+
+                    String invoiceQuery = "INSERT INTO invoice (customer_id) VALUES (?)";
+                    PreparedStatement invoicePs = conn.prepareStatement(invoiceQuery, Statement.RETURN_GENERATED_KEYS);
+                    invoicePs.setInt(1, customerId);
+                    invoicePs.executeUpdate();
+
+                    ResultSet generatedKeys = invoicePs.getGeneratedKeys();
+                    int invoiceId = -1;
+                    if (generatedKeys.next()) {
+                        invoiceId = generatedKeys.getInt(1);
+                    }
+
+                    String itemQuery = "INSERT INTO invoice_item (invoice_id, product_name, unit_price, quantity) VALUES (?, ?, ?, ?)";
+                    PreparedStatement itemPs = conn.prepareStatement(itemQuery);
+
+                    for (int i = 0; i < tableModel.getRowCount(); i++) {
+                        String productName = tableModel.getValueAt(i, 0).toString();
+                        int qty = Integer.parseInt(tableModel.getValueAt(i, 1).toString());
+                        double itemPrice = Double.parseDouble(tableModel.getValueAt(i, 2).toString());
+
+                        itemPs.setInt(1, invoiceId);
+                        itemPs.setString(2, productName);
+                        itemPs.setDouble(3, itemPrice);
+                        itemPs.setInt(4, qty);
+                        itemPs.addBatch();
+                    }
+
+                    itemPs.executeBatch();
+                    conn.commit();
+                    conn.close();
+
+                    JOptionPane.showMessageDialog(null, "Invoice #" + invoiceId + " saved successfully!", "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+
+                    printInvoiceReceipt(customerName, invoiceId, tableModel, runningTotal[0]);
+
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    if (conn != null) {
+                        try {
+                            conn.rollback();
+                            conn.close();
+                        } catch (SQLException se) {
+                            se.printStackTrace();
+                        }
+                    }
+                    JOptionPane.showMessageDialog(null, "Error saving invoice: " + ex.getMessage(), "Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+
+        submitBtn.addActionListener(submitAction);
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    public void showInvoiceHistory(String customerName, int customerId) {
+        JFrame frame = new JFrame("Invoice History - " + customerName);
+        frame.setSize(700, 450);
+        frame.setLayout(null);
+
+        JLabel heading = new JLabel("Invoices for " + customerName);
+        heading.setBounds(10, 10, 400, 30);
+        frame.add(heading);
+
+        String columnName[] = {
+                "Invoice #",
+                "Date",
+                "Total Amount"
+        };
+
+        DefaultTableModel tableModel = new DefaultTableModel(columnName, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // all cells are now non-editable
+            }
+        };
+
+        JTable historyTable = new JTable(tableModel);
+        historyTable.setBounds(20, 50, 645, 280);
+
+        JScrollPane scrollPane = new JScrollPane(historyTable);
+        scrollPane.setBounds(20, 50, 645, 280);
+        frame.add(scrollPane);
+
+        JButton viewDetailsBtn = new JButton("View Details");
+        viewDetailsBtn.setBounds(20, 345, 130, 30);
+        frame.add(viewDetailsBtn);
+
+        JButton backBtn = new JButton("Back to Customers");
+        backBtn.setBounds(160, 345, 180, 30);
+        frame.add(backBtn);
+
+        loadInvoiceHistory(tableModel, customerId);
+
+        // Action listener for view details button
+        ActionListener a1 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int selectedRow = historyTable.getSelectedRow();
+                if (selectedRow == -1) {
+                    JOptionPane.showMessageDialog(null, "Please select an invoice first", "Warning",
+                            JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                Object invoiceId = tableModel.getValueAt(selectedRow, 0);
+                showInvoiceDetails(Integer.parseInt(invoiceId.toString()));
+                frame.dispose();
+            }
+        };
+
+        viewDetailsBtn.addActionListener(a1);
+
+        // Action listener for back button
+        ActionListener a2 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                goBackToCustomers(frame);
+            }
+        };
+
+        backBtn.addActionListener(a2);
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    public void loadInvoiceHistory(DefaultTableModel tableModel, int customerId) {
+        PreparedStatement ps = null;
+
         try {
-            Connection c = DatabaseHelper.open();
-            PreparedStatement ps = c.prepareStatement(
-                "SELECT id, invoice_date, total_amount FROM invoice WHERE customer_id = ? ORDER BY id DESC"
-            );
+            Connection conn = DatabaseHelper.open();
+            String query = "SELECT id, invoice_date, total_amount FROM invoice WHERE customer_id = ? ORDER BY id DESC";
+            ps = conn.prepareStatement(query);
             ps.setInt(1, customerId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                model.addRow(new Object[]{rs.getInt("id"), rs.getString("invoice_date"), rs.getDouble("total_amount")});
+                tableModel.addRow(new Object[] {
+                        rs.getInt("id"), rs.getString("invoice_date"), rs.getDouble("total_amount")
+                });
             }
-            c.close();
+            conn.close();
         } catch (Exception ex) {
             ex.printStackTrace();
+            return;
         }
     }
 
-    private void fetchInvoiceItems(DefaultTableModel model, int invoiceId) {
+    public void showInvoiceDetails(int invoiceId) {
+        JFrame frame = new JFrame("Invoice #" + invoiceId + " Details");
+        frame.setSize(550, 400);
+        frame.setLayout(null);
+
+        JLabel heading = new JLabel("Invoice #" + invoiceId);
+        heading.setBounds(10, 10, 300, 30);
+        frame.add(heading);
+
+        String columnName[] = {
+                "Product",
+                "Qty",
+                "Unit Price",
+                "Total"
+        };
+
+        DefaultTableModel tableModel = new DefaultTableModel(columnName, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // all cells are now non-editable
+            }
+        };
+
+        JTable detailTable = new JTable(tableModel);
+        detailTable.setBounds(20, 50, 500, 220);
+
+        JScrollPane scrollPane = new JScrollPane(detailTable);
+        scrollPane.setBounds(20, 50, 500, 220);
+        frame.add(scrollPane);
+
+        loadInvoiceItems(tableModel, invoiceId);
+
+        // calculate total from loaded items
+        Double totalAmount = 0.00;
+        for (int i = 0; i < tableModel.getRowCount(); i++) {
+            totalAmount = totalAmount + Double.parseDouble(tableModel.getValueAt(i, 3).toString());
+        }
+
+        JLabel totalLabel = new JLabel("Total: " + String.format("%.2f", totalAmount));
+        totalLabel.setBounds(350, 280, 180, 30);
+        frame.add(totalLabel);
+
+        JButton backBtn = new JButton("Back to Customers");
+        backBtn.setBounds(20, 320, 180, 30);
+        frame.add(backBtn);
+
+        // Action listener for back button
+        ActionListener a1 = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                goBackToCustomers(frame);
+            }
+        };
+
+        backBtn.addActionListener(a1);
+
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    public void loadInvoiceItems(DefaultTableModel tableModel, int invoiceId) {
+        PreparedStatement ps = null;
+
         try {
-            Connection c = DatabaseHelper.open();
-            PreparedStatement ps = c.prepareStatement(
-                "SELECT product_name, quantity, unit_price, total FROM invoice_item WHERE invoice_id = ?"
-            );
+            Connection conn = DatabaseHelper.open();
+            String query = "SELECT product_name, quantity, unit_price, total FROM invoice_item WHERE invoice_id = ?";
+            ps = conn.prepareStatement(query);
             ps.setInt(1, invoiceId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                model.addRow(new Object[]{
-                    rs.getString("product_name"), rs.getInt("quantity"),
-                    rs.getDouble("unit_price"), rs.getDouble("total")
+                tableModel.addRow(new Object[] {
+                        rs.getString("product_name"), rs.getInt("quantity"),
+                        rs.getDouble("unit_price"), rs.getDouble("total")
                 });
             }
-            c.close();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-    }
-
-    private int persistInvoice(int customerId, DefaultTableModel items) {
-        Connection conn = null;
-        try {
-            conn = DatabaseHelper.open();
-            conn.setAutoCommit(false);
-
-            PreparedStatement invStmt = conn.prepareStatement(
-                "INSERT INTO invoice (customer_id) VALUES (?)", Statement.RETURN_GENERATED_KEYS
-            );
-            invStmt.setInt(1, customerId);
-            invStmt.executeUpdate();
-
-            ResultSet keys = invStmt.getGeneratedKeys();
-            int invId = -1;
-            if (keys.next()) invId = keys.getInt(1);
-
-            PreparedStatement lineStmt = conn.prepareStatement(
-                "INSERT INTO invoice_item (invoice_id, product_name, unit_price, quantity) VALUES (?, ?, ?, ?)"
-            );
-
-            for (int i = 0; i < items.getRowCount(); i++) {
-                lineStmt.setInt(1, invId);
-                lineStmt.setString(2, items.getValueAt(i, 0).toString());
-                lineStmt.setDouble(3, Double.parseDouble(items.getValueAt(i, 2).toString()));
-                lineStmt.setInt(4, Integer.parseInt(items.getValueAt(i, 1).toString()));
-                lineStmt.addBatch();
-            }
-
-            lineStmt.executeBatch();
-            conn.commit();
             conn.close();
-            return invId;
         } catch (Exception ex) {
             ex.printStackTrace();
-            if (conn != null) {
-                try { conn.rollback(); conn.close(); } catch (SQLException se) { se.printStackTrace(); }
-            }
-            JOptionPane.showMessageDialog(window, "Failed to save: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            return -1;
+            return;
         }
     }
 
-    private void generatePrintout(String customerName, int invoiceId, DefaultTableModel items, double grandTotal) {
-        PrinterJob pj = PrinterJob.getPrinterJob();
-        pj.setJobName("Inv-" + invoiceId);
+    public void printInvoiceReceipt(String customerName, int invoiceId, DefaultTableModel tableModel, double totalAmount) {
+        PrinterJob printerJob = PrinterJob.getPrinterJob();
+        printerJob.setJobName("Invoice #" + invoiceId + " - " + customerName);
 
-        pj.setPrintable(new Printable() {
+        printerJob.setPrintable(new Printable() {
             @Override
-            public int print(Graphics g, PageFormat pf, int page) throws PrinterException {
-                if (page > 0) return NO_SUCH_PAGE;
+            public int print(Graphics graphics, PageFormat pageFormat, int pageIndex) throws PrinterException {
+                if (pageIndex > 0)
+                    return NO_SUCH_PAGE;
 
-                Graphics2D g2 = (Graphics2D) g;
-                g2.translate(pf.getImageableX(), pf.getImageableY());
+                Graphics2D g2d = (Graphics2D) graphics;
+                g2d.translate(pageFormat.getImageableX(), pageFormat.getImageableY());
 
-                int left = 15, top = 25, gap = 18;
-                int width = 480;
+                int x = 10;
+                int y = 30;
+                int lineHeight = 20;
 
-                Font headingFont = new Font("SansSerif", Font.BOLD, 16);
-                Font labelFont = new Font("SansSerif", Font.BOLD, 11);
-                Font bodyFont = new Font("SansSerif", Font.PLAIN, 11);
-                Font footerFont = new Font("SansSerif", Font.ITALIC, 9);
+                Font titleFont = new Font("Arial", Font.BOLD, 18);
+                Font headerFont = new Font("Arial", Font.BOLD, 12);
+                Font regularFont = new Font("Arial", Font.PLAIN, 12);
+                Font smallFont = new Font("Arial", Font.ITALIC, 10);
 
-                g2.setFont(headingFont);
-                g2.drawString("BILLING INVOICE", left, top);
-                top += gap + 8;
+                int pageWidth = 500;
 
-                g2.drawLine(left, top, width, top);
-                top += 12;
+                // ---- Title ----
+                g2d.setFont(titleFont);
+                g2d.drawString("BILLING INVOICE", x, y);
+                y += lineHeight + 5;
 
-                g2.setFont(bodyFont);
-                g2.drawString("Ref: INV-" + invoiceId, left, top);
-                top += gap;
-                g2.drawString("Customer: " + customerName, left, top);
-                top += gap;
-                String stamp = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
-                g2.drawString("Issued: " + stamp, left, top);
-                top += gap + 8;
+                // ---- Separator ----
+                g2d.drawLine(x, y, pageWidth, y);
+                y += 10;
 
-                g2.drawLine(left, top, width, top);
-                top += 6;
-                g2.setFont(labelFont);
-                g2.drawString("Description", left, top);
-                g2.drawString("Qty", 250, top);
-                g2.drawString("Price", 310, top);
-                g2.drawString("Amount", 400, top);
-                top += 4;
-                g2.drawLine(left, top, width, top);
-                top += gap;
+                // ---- Invoice info ----
+                g2d.setFont(regularFont);
+                g2d.drawString("Invoice #: " + invoiceId, x, y);
+                y += lineHeight;
+                g2d.drawString("Customer : " + customerName, x, y);
+                y += lineHeight;
+                String date = new SimpleDateFormat("dd MMM yyyy, hh:mm a").format(new Date());
+                g2d.drawString("Date     : " + date, x, y);
+                y += lineHeight + 10;
 
-                g2.setFont(bodyFont);
-                for (int i = 0; i < items.getRowCount(); i++) {
-                    g2.drawString(items.getValueAt(i, 0).toString(), left, top);
-                    g2.drawString(items.getValueAt(i, 1).toString(), 250, top);
-                    g2.drawString(items.getValueAt(i, 2).toString(), 310, top);
-                    g2.drawString(items.getValueAt(i, 3).toString(), 400, top);
-                    top += gap;
+                // ---- Table Header ----
+                g2d.drawLine(x, y, pageWidth, y);
+                y += 8;
+                g2d.setFont(headerFont);
+                g2d.drawString("Product", x, y);
+                g2d.drawString("Qty", 230, y);
+                g2d.drawString("Unit Price", 290, y);
+                g2d.drawString("Total", 410, y);
+                y += 5;
+                g2d.drawLine(x, y, pageWidth, y);
+                y += lineHeight;
+
+                // ---- Table Rows ----
+                g2d.setFont(regularFont);
+                for (int i = 0; i < tableModel.getRowCount(); i++) {
+                    String product = tableModel.getValueAt(i, 0).toString();
+                    String qty = tableModel.getValueAt(i, 1).toString();
+                    String price = tableModel.getValueAt(i, 2).toString();
+                    String total = tableModel.getValueAt(i, 3).toString();
+                    g2d.drawString(product, x, y);
+                    g2d.drawString(qty, 230, y);
+                    g2d.drawString(price, 290, y);
+                    g2d.drawString(total, 410, y);
+                    y += lineHeight;
                 }
 
-                g2.drawLine(left, top, width, top);
-                top += gap;
-                g2.setFont(labelFont);
-                g2.drawString(String.format("GRAND TOTAL: %.2f", grandTotal), 290, top);
-                top += gap + 8;
+                // ---- Total ----
+                g2d.drawLine(x, y, pageWidth, y);
+                y += lineHeight;
+                g2d.setFont(headerFont);
+                g2d.drawString(String.format("TOTAL AMOUNT: %.2f", totalAmount), 270, y);
+                y += lineHeight + 10;
 
-                g2.setFont(footerFont);
-                g2.drawLine(left, top, width, top);
-                top += 12;
-                g2.drawString("We appreciate your business.", left, top);
+                // ---- Footer ----
+                g2d.setFont(smallFont);
+                g2d.drawLine(x, y, pageWidth, y);
+                y += 10;
+                g2d.drawString("Thank you for your purchase!", x, y);
 
                 return PAGE_EXISTS;
             }
         });
 
-        if (pj.printDialog()) {
-            try { pj.print(); } catch (PrinterException ex) {
+        if (printerJob.printDialog()) {
+            try {
+                printerJob.print();
+            } catch (PrinterException ex) {
                 ex.printStackTrace();
-                JOptionPane.showMessageDialog(window, "Print error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(null, "Printing failed: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
             }
         }
     }
 
-    private double computeGrandTotal(DefaultTableModel model) {
-        double sum = 0;
-        int lastCol = model.getColumnCount() - 1;
-        for (int i = 0; i < model.getRowCount(); i++) {
-            sum += Double.parseDouble(model.getValueAt(i, lastCol).toString());
-        }
-        return Math.round(sum * 100.0) / 100.0;
+    public void goBackToCustomers(JFrame frame) {
+        frame.dispose();
+        showCustomerList();
     }
 
-    public static boolean validateDecimal(String val) {
+    public static boolean isValidDecimal(String text) {
+        if (text == null || text.isEmpty())
+            return false;
+
+        // Only one dot is allowed
+        int dotCount = text.length() - text.replace(".", "").length();
+        if (dotCount > 1)
+            return false;
+
         try {
-            double d = Double.parseDouble(val);
-            return d >= 0;
+            Double.parseDouble(text);
+            return true;
         } catch (NumberFormatException e) {
             return false;
         }
     }
 
-    public static boolean validateInteger(String val) {
+    public static boolean isValidInteger(String text) {
+        if (text == null || text.isEmpty())
+            return false;
         try {
-            int i = Integer.parseInt(val);
-            return i > 0;
+            Integer.parseInt(text);
+            return true;
         } catch (NumberFormatException e) {
             return false;
         }
